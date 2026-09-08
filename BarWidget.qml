@@ -5,7 +5,7 @@
 //
 //  · Zeigt NUR ein Symbol (♪) – der aktuelle Titel steht als Tooltip bereit.
 //    So bleibt das Widget unabhängig vom Wiedergabe-Zustand kompakt und
-//    verändert seine Breite nicht.
+//    verändert seine Breite nicht (Wunsch des Autors: „nur ein Symbol“).
 //  · Linksklick  → öffnet/schließt das Panel (Musik · Video · Lesen · Funk).
 //  · Mittelklick → Play/Pause umschalten, ohne das Panel zu öffnen.
 //  · Pulsierender Akzent-Punkt, während Musik läuft (Theme-Akzentfarbe).
@@ -71,10 +71,13 @@ BarWidget {
     onBarChanged: injectPanel()
 
     // ------------------------- MPRIS-Polling ---------------------------------
-    // Sieben kurze, wohldokumentierte playerctl-Aufrufe alle 2 Sekunden:
+    // Sieben kurze playerctl-Aufrufe alle 2 Sekunden – gezielt auf UNSER
+    // mpv (-p mpv), damit Anzeige und Steuerung immer denselben Player
+    // meinen, selbst wenn parallel ein Browser o. Ä. MPRIS meldet:
     //   1) Titel + Interpret, 2) Wiedergabestatus, 3) Lautstärke,
     //   4) aktuelle Position, 5) Titellänge, 6) Shuffle-Status, 7) Loop-Status.
-    // Läuft kein MPRIS-Player, bleibt der alte Stand einfach stehen.
+    // Läuft kein mpv mehr (Liste zu Ende/gestoppt), setzt der Status-Poll
+    // die Anzeige sauber auf „Stopped“ zurück statt einzufrieren.
     Timer {
         id: mprisTimer
         interval: 2000
@@ -95,7 +98,7 @@ BarWidget {
     // 1) Titel + Interpret abfragen (format-Template ist playerctl-Standard).
     Process {
         id: metaProc
-        command: ["playerctl", "metadata", "--format",
+        command: ["playerctl", "-p", "mpv", "metadata", "--format",
                   "title={{title}}\nartist={{artist}}"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -107,15 +110,26 @@ BarWidget {
     }
 
     // 2) Wiedergabestatus (gibt „Playing“, „Paused“ oder „Stopped“ aus).
+    //    Unbekannte/leere Ausgabe = kein mpv mehr da → Anzeige zurücksetzen.
     Process {
         id: statusProc
-        command: ["playerctl", "status"]
+        command: ["playerctl", "-p", "mpv", "status"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const s = this.text.trim()
-                // Nur bekannte Stati übernehmen, Fehlerausgaben ignorieren.
-                if (s === "Playing" || s === "Paused" || s === "Stopped")
+                if (s === "Playing" || s === "Paused") {
                     root.playerStatus = s
+                } else if (s === "Stopped") {
+                    root.playerStatus = "Stopped"
+                } else {
+                    // mpv beendet (Playlist-Ende, ■-Stopp, Fehler) – Titel
+                    // und Position nicht stehen lassen, sondern leer setzen.
+                    root.playerStatus = "Stopped"
+                    root.trackTitle = ""
+                    root.trackArtist = ""
+                    root.trackPosition = 0
+                    root.trackDuration = 0
+                }
             }
         }
     }
@@ -123,7 +137,7 @@ BarWidget {
     // 3) Lautstärke (playerctl meldet je nach Version 0..1 oder Prozent).
     Process {
         id: volumeProc
-        command: ["playerctl", "volume"]
+        command: ["playerctl", "-p", "mpv", "volume"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const v = Model.parseVolume(this.text)
@@ -135,7 +149,7 @@ BarWidget {
     // 4) Aktuelle Position in Sekunden (z. B. „83.26“).
     Process {
         id: positionProc
-        command: ["playerctl", "position"]
+        command: ["playerctl", "-p", "mpv", "position"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const v = parseFloat(String(this.text).trim())
@@ -147,7 +161,7 @@ BarWidget {
     // 5) Titellänge: mpris:length wird in Mikrosekunden gemeldet.
     Process {
         id: durationProc
-        command: ["playerctl", "metadata", "mpris:length"]
+        command: ["playerctl", "-p", "mpv", "metadata", "mpris:length"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const s = String(this.text).trim()
@@ -161,7 +175,7 @@ BarWidget {
     // 6) Shuffle-Status (gibt „On“ oder „Off“ aus; unklar = ignorieren).
     Process {
         id: shuffleStateProc
-        command: ["playerctl", "shuffle"]
+        command: ["playerctl", "-p", "mpv", "shuffle"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const v = Model.parseOnOff(this.text)
@@ -173,7 +187,7 @@ BarWidget {
     // 7) Loop-Status (gibt „None“, „Track“ oder „Playlist“ aus).
     Process {
         id: loopStateProc
-        command: ["playerctl", "loop"]
+        command: ["playerctl", "-p", "mpv", "loop"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const v = Model.parseLoop(this.text)
@@ -218,9 +232,9 @@ BarWidget {
         }
     }
 
-    // Mittelklick → Play/Pause (MPRIS).
+    // Mittelklick → Play/Pause (MRIS, gezielt unser mpv).
     Process {
         id: toggleProc
-        command: ["playerctl", "play-pause"]
+        command: ["playerctl", "-p", "mpv", "play-pause"]
     }
 }
