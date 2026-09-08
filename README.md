@@ -14,9 +14,7 @@ interaktiv im Browser ausprobieren, bevor das PlugIn installiert wird.
 **Musik und Videos laufen dort echt:** die Demo streamt echte MP3s der
 Familienfabrik-Playlisten und spielt die Fabrik-Videos als YouTube-Embeds.
 
-Ein `bar-widget` für [Omarchy 4](https://omarchy.org) (Arch Linux + Hyprland
-+ Quickshell-Shell). Die Leiste zeigt ein ♪-Symbol (der aktuelle Titel steht
-im Tooltip), ein Klick öffnet das Panel mit vier Werkstätten: **Musik**
+Ein `bar-widget` für [Omarchy 4](https://omarchy.org) (Arch Linux + Hyprland + Quickshell-Shell). Die Leiste zeigt ein ♪-Symbol (der aktuelle Titel steht im Tooltip), ein Klick öffnet das Panel mit vier Werkstätten: **Musik**
 (MPRIS-Steuerung + Playlist-Browser mit allen Playlisten von
 familienfabrik.at), **Video** (mpv-Launcher + die Fabrik-Videos inklusive
 Untertitel), **Lesen** (Geschichten direkt im Panel, ganz ohne Browser) und
