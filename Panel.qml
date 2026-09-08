@@ -629,7 +629,7 @@ Panel {
                     anchors.left: headerTitle.right
                     anchors.leftMargin: Style.space(8)
                     anchors.baseline: headerTitle.baseline
-                    text: "v1.1.0"
+                    text: "v1.1.1"
                     color: Qt.alpha(root.barForeground, 0.55)
                     font.family: root.monoFont
                     font.pixelSize: Style.font.subtitle
