@@ -16,6 +16,45 @@ nach oben, das Neueste zuerst.
   SoundCloud-/hearthis.at-APIs in `Model.js` zu übernehmen.
 - Hinweis im Panel, wenn eine neuere PlugIn-Version auf GitHub liegt.
 
+## [1.1.1] – 2026-09-08
+
+Patch-Release: Die **Projekt-Seite spielt jetzt echte Musik und echte
+Videos** – vorher war die Browser-Demo eine reine Simulation ohne Ton.
+Die Laufzeit-Dateien des PlugIns (BarWidget.qml, Panel.qml, Model.js)
+sind unverändert; der Patch richtet die Release-Kette (Manifest,
+Panel-Fußzeile, Badge, ZIP) auf den neuen Stand der Projekt-Seite aus.
+
+### Hinzugefügt (Projekt-Seite <https://familienfabrik-omarchy.space-z.ai>)
+
+- **Echter Musik-Player im Browser:** Die Demo löst die Songs
+  serverseitig auf und streamt echte MP3s – SoundCloud (128 kbps),
+  hearthis.at (192 kbps) und direkte MP3s von familienfabrik.at – über
+  einen Streaming-Proxy **mit echtem Spulen** (Range-Requests).
+  Play/Pause/Stopp, Lautstärke, Shuffle/Loop und automatische
+  Titelketten wirken auf die echte Wiedergabe; Cover-Artwork und
+  Titel-Dauern kommen aus den Quellen. Startet die Wiedergabe im
+  Panel, läuft sie beim Schließen im Hintergrund weiter.
+- **Vollformat-Popup-Player (⧉):** Jede Playlist lässt sich per Knopf
+  in einem eigenen Popup öffnen – großes Cover, Transport, Lautstärke,
+  Titelliste zum Direktsprung – genau wie die Video-Popups.
+- **Coversongs im offiziellen Tonstudio-Player:** Das Album spielt als
+  hearthis.at-Einbettung – dieselbe, die familienfabrik.at selbst
+  einbindet.
+- **Fabrik-Videos als echte YouTube-Embeds** im selben Popup-Stil mit
+  autoplay, „vorheriges/nächstes Video“ und Link zum Kanal.
+- **Autoplay-Sperre erkannt:** Blockiert der Browser den Autostart,
+  zeigt der Player einen klaren Hinweis („autostart geblockt – ▶
+  klicken“) statt stumm zu versagen.
+- Abspiel-Zähler je Titel in der Datenbank der Projekt-Seite
+  (Grundlage für künftige Statistik-Auswertungen).
+
+### Behoben (Projekt-Seite)
+
+- Die Demo zeigte vorher einen simulierten Fortschrittsbalken ohne
+  Ton – Play/Pause, Spulen, Nächster-Titel und Stopp steuern jetzt
+  die echte Wiedergabe. „Gute Laune“ (Mitsingen) und die Hörbücher
+  laufen ebenfalls als echte Streams.
+
 ## [1.1.0] – 2026-09-08
 
 Erste Pflege-Version: alle drei gemeldeten Probleme behoben (Pause/Stopp,
@@ -49,6 +88,10 @@ für GitHub aufgeräumt (Funding, CI, portabler Validator, SemVer-Prozess).
   Support-Seite), CI-Workflow (`.github/workflows/validate.yml`) mit den
   automatischen Prüfungen bei jedem Push, portabler Validator in
   `tools/validate-plugin.mjs` und `.gitignore`.
+- **Projekt-Seite mit Demo:** README und Releases verlinken die interaktive
+  Projekt-Seite (PlugIn-Vorschau mit Musik, Video, Lesen und Funk im
+  Browser) unter
+  `https://familienfabrik-omarchy.space-z.ai`.
 
 ### Behoben
 
@@ -80,7 +123,7 @@ für GitHub aufgeräumt (Funding, CI, portabler Validator, SemVer-Prozess).
   lesbar und Ursache-genau übersetzt (`Model.ytDlpError`).
 - `Model.titleFromUrl` leitet Notfall-Titel aus dem URL-Slug ab, falls ein
   Eintrag mal ohne Titel kommt.
-- Validierung auf **175 automatische Prüfungen** erweitert und als
+- Validierung auf **176 automatische Prüfungen** erweitert und als
   `tools/validate-plugin.mjs` ins Repository gezogen (läuft portabel per
   `node tools/validate-plugin.mjs` und im GitHub-Workflow bei jedem Push
   und Pull Request).
@@ -137,6 +180,7 @@ Erstveröffentlichung.
   Deinstallation.
 - `LICENSE` (MIT), `preview.png`, dieses Changelog.
 
-[Unveröffentlicht]: https://github.com/bussdeeAI/at.familienfabrik_omarchy/compare/v1.1.0...HEAD
+[Unveröffentlicht]: https://github.com/bussdeeAI/at.familienfabrik_omarchy/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/bussdeeAI/at.familienfabrik_omarchy/releases/tag/v1.1.1
 [1.1.0]: https://github.com/bussdeeAI/at.familienfabrik_omarchy/releases/tag/v1.1.0
 [1.0.0]: https://github.com/bussdeeAI/at.familienfabrik_omarchy/releases/tag/v1.0.0
