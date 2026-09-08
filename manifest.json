@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "at.familienfabrik.omarchy",
   "name": "Familienfabrik.at",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Familie BausL – Familienfabrik.at",
   "license": "MIT",
   "description": "Omarchy Tools aus der FamilienFabrik: Musik-Player mit allen Playlisten der Website (sequenzielle Wiedergabe via mpv), Fabrik-Videos mit Untertiteln, Geschichten direkt im Panel lesbar und der Fabrik-Funk-News-Feed – alles aus der Quattro-Leiste, passend zum Omarchy-Theme.",
