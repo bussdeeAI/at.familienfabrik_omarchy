@@ -5,10 +5,18 @@
 > der Quattro-Leiste. Von Familie BausL (Lübeck), für alle, die ihre Fabrik
 > immer dabei haben wollen.
 
-[![Version 1.1.0](https://img.shields.io/badge/version-1.1.0-84cc16?labelColor=18181b)](CHANGELOG.md)
+[![Version 1.1.1](https://img.shields.io/badge/version-1.1.1-84cc16?labelColor=18181b)](CHANGELOG.md)
 [![Lizenz: MIT](https://img.shields.io/badge/license-MIT-24292e?labelColor=18181b)](LICENSE)
 
-Ein `bar-widget` für [Omarchy 4](https://omarchy.org) (Arch Linux + Hyprland + Quickshell-Shell). Die Leiste zeigt ein ♪-Symbol (der aktuelle Titel steht im Tooltip), ein Klick öffnet das Panel mit vier Werkstätten: **Musik**
+**Projekt-Seite mit Demo:** <https://familienfabrik-omarchy.space-z.ai> –
+alle vier Werkstätten (Musik, Video, Lesen, Funk) lassen sich dort
+interaktiv im Browser ausprobieren, bevor das PlugIn installiert wird.
+**Musik und Videos laufen dort echt:** die Demo streamt echte MP3s der
+Familienfabrik-Playlisten und spielt die Fabrik-Videos als YouTube-Embeds.
+
+Ein `bar-widget` für [Omarchy 4](https://omarchy.org) (Arch Linux + Hyprland
++ Quickshell-Shell). Die Leiste zeigt ein ♪-Symbol (der aktuelle Titel steht
+im Tooltip), ein Klick öffnet das Panel mit vier Werkstätten: **Musik**
 (MPRIS-Steuerung + Playlist-Browser mit allen Playlisten von
 familienfabrik.at), **Video** (mpv-Launcher + die Fabrik-Videos inklusive
 Untertitel), **Lesen** (Geschichten direkt im Panel, ganz ohne Browser) und
@@ -66,13 +74,13 @@ Danach in der Leiste rechts das **♪**-Widget anklicken – fertig.
 
 ### Variante B · ZIP-Download (manuell)
 
-1. ZIP von der [PlugIn-Website](https://familienfabrik.at) herunterladen
-   (oder GitHub: grüner **Code**-Button → **Download ZIP**).
+1. ZIP von der [Projekt-Seite](https://familienfabrik-omarchy.space-z.ai)
+   herunterladen (oder GitHub: grüner **Code**-Button → **Download ZIP**).
 2. Entpacken und den Ordner an den richtigen Ort legen:
 
    ```bash
    mkdir -p ~/.config/omarchy/plugins/at.familienfabrik.omarchy
-   unzip familienfabrik-omarchy-plugin-1.1.0.zip \
+   unzip familienfabrik-omarchy-plugin-1.1.1.zip \
      -d ~/.config/omarchy/plugins/at.familienfabrik.omarchy
    ```
 
@@ -248,6 +256,8 @@ im Repository (PayPal oder [Support-Seite](https://familienfabrik.at/unterstuetz
 
 ## Links
 
+- **Projekt-Seite mit Demo:**
+  <https://familienfabrik-omarchy.space-z.ai>
 - **Website:** <https://familienfabrik.at>
 - **Unterstützen:** <https://familienfabrik.at/unterstuetzen> (auch via
   PayPal: <https://paypal.me/bussdee>)
