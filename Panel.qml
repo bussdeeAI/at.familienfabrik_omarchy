@@ -3,12 +3,16 @@
 //
 //  Aufklappendes Quattro-Panel (max. ~480 px breit) mit vier Werkstätten:
 //
-//    ♪ Musik      – Now Playing + Play/Pause/Weiter/Zurück (playerctl/MPRIS),
+//    ♪ Musik      – Now Playing + Play/Pause/Weiter/Zurück/Stopp (playerctl/MPRIS),
 //                   Spul-Balken, Shuffle & Loop, Lautstärke-Regler,
 //                   Playlist-Browser mit ALLEN Playlisten der Website
 //                   (Übersicht → Auswahl → Titel-Liste), sequenzielle
-//                   Wiedergabe via mpv/M3U (ab gewähltem Titel),
-//                   Free-URL-Import via yt-dlp.
+//                   Wiedergabe via mpv/M3U (ab gewähltem Titel).
+//                   Die Song-Titel kommen aus dem ECHTEN Katalog in
+//                   Model.js (Titel · Dauer · URL, Stand 09/2026) – sie
+//                   erscheinen sofort, ganz ohne yt-dlp. Free-URL-Import
+//                   und dynamische Playlisten lesen via yt-dlp (bash-
+//                   Wrapper mit klaren Fehlermeldungen).
 //    ▶ Video      – mpv-Launcher für YouTube-Links/-Playlisten und Dateien,
 //                   die Fabrik-Videos („Animierte Kinderlieder“, inkl.
 //                   Untertitel) plus Verlauf „zuletzt genutzt“.
@@ -128,10 +132,11 @@ Panel {
 
     // ------------------------- Aktionen ---------------------------------------
 
-    // Lautstärke ans MPRIS-System durchreichen (playerctl nimmt 0.00–1.00).
+    // Lautstärke ans MPRIS-System durchreichen (playerctl nimmt 0.00–1.00;
+    // zielt gezielt auf unser mpv, siehe Transport oben).
     function applyVolume() {
         const v = Math.max(0, Math.min(1, pendingVolume))
-        setVolumeProc.command = ["playerctl", "volume", v.toFixed(2)]
+        setVolumeProc.command = ["playerctl", "-p", "mpv", "volume", v.toFixed(2)]
         setVolumeProc.running = true
         if (root.hostWidget) root.hostWidget.trackVolume = v
     }
@@ -146,7 +151,7 @@ Panel {
         if (!root.hostWidget || !(root.hostWidget.trackDuration > 0)) return
         const target = Math.max(0, Math.min(1, fraction))
             * root.hostWidget.trackDuration
-        seekProc.command = ["playerctl", "position", Math.round(target).toString()]
+        seekProc.command = ["playerctl", "-p", "mpv", "position", Math.round(target).toString()]
         seekProc.running = true
         // Sofortiges visuelles Feedback, bis der nächste Poll nachzieht.
         root.hostWidget.trackPosition = Math.round(target)
@@ -164,7 +169,7 @@ Panel {
         const order = ["None", "Track", "Playlist"]
         const idx = order.indexOf(root.loopState)
         const next = order[(idx + 1 + order.length) % order.length]
-        loopSetProc.command = ["playerctl", "loop", next]
+        loopSetProc.command = ["playerctl", "-p", "mpv", "loop", next]
         loopSetProc.running = true
         // Sofortiges visuelles Feedback, bis der nächste Poll nachzieht.
         if (root.hostWidget) root.hostWidget.loopState = next
@@ -172,19 +177,25 @@ Panel {
 
     // ---- Playlist-Browser (Musik-Tab) ----------------------------------
 
-    // Playlist aus der Übersicht wählen: Titel laden, automatisch die
-    // GANZE Playlist nacheinander abspielen und die Titel-Liste anzeigen
-    // (Klick auf einen Titel startet ab dort neu).
+    // Playlist aus der Übersicht wählen: Titel anzeigen und automatisch die
+    // GANZE Playlist nacheinander abspielen (Klick auf einen Titel startet
+    // ab dort neu).
+    //
+    // Die Titel kommen aus dem ECHTEN Song-Katalog in Model.js (Titel ·
+    // Dauer · URL, ausgelesen aus den öffentlichen Plattform-APIs): Die
+    // Liste erscheint SOFORT – ganz ohne yt-dlp, ganz ohne Wartezeit. Erst
+    // die Wiedergabe selbst löst beim mpv die Stream-URL auf.
     function selectPlaylist(index) {
         const p = playlists[index]
         if (!p) return
         currentPlaylistPage = p.page !== undefined ? p.page : ""
+
         // Direkte Audio-Datei (Mitsingen-Lied): läuft ohne yt-dlp sofort –
         // Eintrag „file“ wird zur eintiteligen Wiedergabeliste und startet.
         if (p.file !== undefined && Model.isHttpUrl(p.file)) {
             currentPlaylist = p.name
             playlistSource = p.file
-            playlist = [{ title: p.name, url: p.file }]
+            playlist = [{ title: p.name, url: p.file, seconds: 0 }]
             importState = "direktes mp3 · läuft ohne yt-dlp"
             playFrom(0)
             return
@@ -195,10 +206,30 @@ Panel {
         }
         currentPlaylist = p.name
         playlistSource = p.url
+
+        // Song-Katalog sofort laden: Titel + Dauern stehen MITTLERWEILE
+        // ohne yt-dlp – nichts „lädt“ mehr, die Liste ist einfach da.
+        const catalog = Model.catalogTracks(p)
+        if (catalog.length > 0) {
+            playlist = catalog
+            const total = Model.playlistSeconds(catalog)
+            importState = catalog.length + " titel im katalog · " +
+                (total > 0 ? Model.fmtTime(total) + " musik · " : "") +
+                "titel stehen ohne yt-dlp bereit"
+            // Wiedergabe startet sofort aus dem Katalog (mpv löst die
+            // Stream-URLs beim Abspielen auf).
+            playFrom(0)
+            return
+        }
+
+        // Kein Katalog (dynamisch geladene Playlist): Titel live via
+        // yt-dlp lesen – mit klarer Fehlermeldung, falls es hakt.
         importState = "lädt… „" + p.name + "“"
         autoPlayOnLoad = true
         playlist = []
-        importProc.command = ["yt-dlp", "--flat-playlist", "--no-warnings", "-J", p.url]
+        importProc.command = ["bash", "-c",
+            "yt-dlp --flat-playlist --no-warnings -J \"$1\" 2>&1",
+            "yt-dlp", p.url]
         importProc.running = true
     }
 
@@ -216,26 +247,65 @@ Panel {
         listsProc.running = true
     }
 
+    // ---- Wiedergabe steuern (ein-Player-Prinzip) -------------------------
+
+    // Beendet ALLE laufenden Wiedergabe-Prozesse des Panels (Musik wie
+    // Video). Quickshell beendet den Kindprozess beim Zurücksetzen von
+    // running – das mpv der Playlist läuft als „exec“-Kind direkt darunter.
+    // So ist sicher: kein Doppel-Sound, neues Starten funktioniert immer.
+    function killAllPlayback() {
+        m3uPlayProc.running = false
+        mpvMusicProc.running = false
+        mpvPlaylistProc.running = false
+        mpvVideoProc.running = false
+    }
+
+    // Optimistisches Feedback: Status sofort auf „Playing“ setzen, bis der
+    // nächste MPRIS-Poll (2 s) den echten Stand vom mpv liefert.
+    function markPlaying() {
+        if (root.hostWidget) root.hostWidget.playerStatus = "Playing"
+    }
+
+    // Wiedergabe STOPPEN (■-Taste): sauberes MPRIS-Stop an unser mpv UND
+    // alle Panel-Player-Prozesse beenden – unabhängig davon, ob gerade
+    // Musik, eine Playlist oder ein Video läuft.
+    function stopPlayback() {
+        stopProc.running = true
+        killAllPlayback()
+        if (root.hostWidget) {
+            root.hostWidget.playerStatus = "Stopped"
+            root.hostWidget.trackTitle = ""
+            root.hostWidget.trackArtist = ""
+            root.hostWidget.trackPosition = 0
+            root.hostWidget.trackDuration = 0
+        }
+        importState = "wiedergabe gestoppt"
+    }
+
     // Titel ab Index abspielen: M3U-Datei mit allen Titeln ab hier schreiben
     // und mpv starten (spielt die Liste nacheinander ab; ein neuer Start
     // stoppt die vorherige Wiedergabe – bewusst als „ein Player“-Prinzip).
     function playFrom(index) {
         if (playlist.length === 0) return
         const m3u = Model.buildM3U(playlist, index)
+        killAllPlayback()
         importState = "spiele ab titel " + (Math.max(0, index) + 1)
         m3uPlayProc.command = ["bash", "-c",
             'mkdir -p "$HOME/.local/state/familienfabrik" && printf \'%s\\n\' "$1" > "$HOME/.local/state/familienfabrik/playlist.m3u" && exec mpv --no-video --playlist="$HOME/.local/state/familienfabrik/playlist.m3u"',
             "mpv", m3u]
         m3uPlayProc.running = true
+        markPlaying()
     }
 
     // Ganze Playlist abspielen (Knopf in der Titel-Liste).
     function playPlaylist() {
+        killAllPlayback()
         if (playlist.length > 0) { playFrom(0); return }
         // Fallback: Quelle direkt an mpv übergeben.
         if (!Model.isHttpUrl(playlistSource)) return
         mpvPlaylistProc.command = ["mpv", "--no-video", "--", playlistSource]
         mpvPlaylistProc.running = true
+        markPlaying()
     }
 
     // Einzelnen Titel aus der Liste abspielen –Playlist läuft NACH diesem
@@ -244,12 +314,17 @@ Panel {
         for (let i = 0; i < playlist.length; i++) {
             if (playlist[i].url === url) { playFrom(i); return }
         }
+        killAllPlayback()
         mpvMusicProc.command = ["mpv", "--no-video", "--", String(url)]
         mpvMusicProc.running = true
+        markPlaying()
     }
 
     // Beliebige Playlist-URL importieren (Free-Import, yt-dlp versteht
-    // SoundCloud, hearthis.at, YouTube-Mixe und mehr).
+    // SoundCloud, hearthis.at, YouTube-Mixe und mehr). Läuft über bash mit
+    // zusammengeführtem stderr (2>&1): Schlägt yt-dlp fehl oder ist nicht
+    // installiert, zeigt die Statuszeile die klare Ursache statt nur
+    // „keine titel gefunden“.
     function importPlaylist(url) {
         if (!Model.isHttpUrl(url)) {
             importState = "bitte eine http(s)-URL eingeben"
@@ -260,7 +335,10 @@ Panel {
         playlistSource = url
         importState = "lädt… liste wird gelesen"
         autoPlayOnLoad = false
-        importProc.command = ["yt-dlp", "--flat-playlist", "--no-warnings", "-J", url]
+        playlist = []
+        importProc.command = ["bash", "-c",
+            "yt-dlp --flat-playlist --no-warnings -J \"$1\" 2>&1",
+            "yt-dlp", url]
         importProc.running = true
     }
 
@@ -297,16 +375,20 @@ Panel {
     // Video aus der YouTube-Playlist „Animierte Kinderlieder“ abspielen;
     // mpv lädt vorhandene deutsche/englische Untertitel mit.
     function playFabrikVideo(url) {
+        killAllPlayback()
         videoHint = "starte mpv… (untertitel: de/en, sofern vorhanden)"
         mpvVideoProc.command = ["mpv", "--slang=de,en", "--", String(url)]
         mpvVideoProc.running = true
+        markPlaying()
     }
 
     // Ganze Fabrik-Videos-Playlist abspielen.
     function playAllVideos() {
+        killAllPlayback()
         videoHint = "starte mpv… ganze wiedergabeliste"
         mpvVideoProc.command = ["mpv", "--slang=de,en", "--", Model.YOUTUBE_PLAYLIST_URL]
         mpvVideoProc.running = true
+        markPlaying()
     }
 
     // Video/Datei mit mpv öffnen und in den Verlauf legen.
@@ -322,8 +404,10 @@ Panel {
             videoHint = "bitte eine URL (https://…) oder einen Pfad (/…, ~/…) eingeben"
             return
         }
+        killAllPlayback()
         videoHint = "starte mpv…"
         mpvVideoProc.running = true
+        markPlaying()
         pushRecent(u)
     }
 
@@ -364,19 +448,22 @@ Panel {
 
     // ------------------------- Prozesse (System-Integration) ------------------
 
-    // Transport via MPRIS – drei Standardaufrufe, Shuffle/Loop (siehe unten).
-    Process { id: ppProc;   command: ["playerctl", "play-pause"] }
-    Process { id: nextProc; command: ["playerctl", "next"] }
-    Process { id: prevProc; command: ["playerctl", "previous"] }
+    // Transport via MPRIS – gezielt UNSER mpv (-p mpv): pause/stoppen/next
+    // greifen damit sicher, auch wenn parallel andere MPRIS-Player laufen
+    // (Browser, Spotify …). Ein Klick trifft immer den Familienfabrik-Song.
+    Process { id: ppProc;   command: ["playerctl", "-p", "mpv", "play-pause"] }
+    Process { id: nextProc; command: ["playerctl", "-p", "mpv", "next"] }
+    Process { id: prevProc; command: ["playerctl", "-p", "mpv", "previous"] }
+    Process { id: stopProc; command: ["playerctl", "-p", "mpv", "stop"] }
 
     // Lautstärke setzen (command wird in applyVolume() gesetzt).
     Process { id: setVolumeProc }
 
-    // Spulen (command wird in seekTo() gesetzt).
+    // Spulen (command wird in seekTo() gesetzt; zielt auf unser mpv).
     Process { id: seekProc }
 
     // Shuffle umschalten (playerctl kennt „toggle“ als direktes Argument).
-    Process { id: shuffleSetProc; command: ["playerctl", "shuffle", "toggle"] }
+    Process { id: shuffleSetProc; command: ["playerctl", "-p", "mpv", "shuffle", "toggle"] }
 
     // Loop setzen (command wird in cycleLoop() gesetzt).
     Process { id: loopSetProc }
@@ -387,7 +474,9 @@ Panel {
     Process { id: m3uPlayProc }      // M3U-Playlist ab gewähltem Titel (--no-video)
     Process { id: mpvVideoProc }     // Video/Datei
 
-    // Titel-Liste einer Playlist via yt-dlp laden. Bei Auswahl aus dem
+    // Titel-Liste einer Playlist via yt-dlp laden (nur noch für dynamisch
+    // geladene Playlisten und den freien URL-Import – die kuratierten
+    // Einträge bringen ihren Song-Katalog mit). Bei Auswahl aus dem
     // Browser (autoPlayOnLoad) startet die Wiedergabe sofort nacheinander.
     Process {
         id: importProc
@@ -396,7 +485,8 @@ Panel {
                 const res = Model.parseYtDlp(this.text)
                 root.playlist = res.items
                 root.importState = res.items.length > 0
-                    ? res.items.length + " titel geladen"
+                    ? res.items.length + " titel geladen · " +
+                      Model.fmtTime(Model.playlistSeconds(res.items)) + " gesamt"
                     : ("keine titel gefunden" + (res.error ? " – " + res.error : ""))
                 if (res.items.length > 0 && root.autoPlayOnLoad) {
                     root.autoPlayOnLoad = false
@@ -408,15 +498,19 @@ Panel {
 
     // Übersicht ALLER Playlisten des SoundCloud-Profils laden; das Ergebnis
     // wird an die kuratierte Übersicht angehängt (Duplikate übersprungen).
+    // Wie der freie Import über bash mit 2>&1 – Fehler landen lesbar in
+    // playlistsState statt in einem stillen Scheitern.
     Process {
         id: listsProc
-        command: ["yt-dlp", "--flat-playlist", "--no-warnings", "-J", Model.PLAYLISTS_SOURCE]
+        command: ["bash", "-c",
+            "yt-dlp --flat-playlist --no-warnings -J \"$1\" 2>&1",
+            "yt-dlp", Model.PLAYLISTS_SOURCE]
         stdout: StdioCollector {
             onStreamFinished: {
                 const res = Model.parseYtDlp(this.text)
                 if (res.items.length === 0) {
                     root.playlistsState = "keine weiteren playlists" +
-                        (res.error ? " (" + res.error + ")" : "")
+                        (res.error ? " · " + res.error : "")
                     return
                 }
                 const known = {}
@@ -535,7 +629,7 @@ Panel {
                     anchors.left: headerTitle.right
                     anchors.leftMargin: Style.space(8)
                     anchors.baseline: headerTitle.baseline
-                    text: "v1.0.0"
+                    text: "v1.1.0"
                     color: Qt.alpha(root.barForeground, 0.55)
                     font.family: root.monoFont
                     font.pixelSize: Style.font.subtitle
@@ -838,6 +932,31 @@ Panel {
                         }
                     }
 
+                    // Stopp (■): beendet Musik ODER Video komplett –
+                    // MPRIS-Stop an unser mpv plus Prozessende (siehe
+                    // stopPlayback()).
+                    Rectangle {
+                        width: Style.space(44); height: Style.space(32)
+                        radius: Style.space(8)
+                        color: Qt.alpha(root.barForeground, stopArea.containsMouse ? 0.18 : 0.07)
+                        border.width: 1
+                        border.color: Qt.alpha(root.barForeground, 0.2)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "■"
+                            color: root.barForeground
+                            font.family: root.monoFont
+                            font.pixelSize: Style.font.subtitle
+                        }
+                        MouseArea {
+                            id: stopArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.stopPlayback()
+                        }
+                    }
+
                     // Shuffle an/aus (aktiv = Akzentfarbe).
                     Rectangle {
                         width: Style.space(44); height: Style.space(32)
@@ -900,7 +1019,7 @@ Panel {
                 Text {
                     text: "shuffle " + (root.shuffleOn ? "an" : "aus")
                           + " · loop " + root.loopLabel
-                          + " · klick auf ⇄/↻ schaltet um"
+                          + " · ■ stoppt · klick auf ⇄/↻ schaltet um"
                     color: Qt.alpha(root.barForeground, 0.45)
                     font.family: root.monoFont
                     font.pixelSize: Style.font.subtitle
@@ -1052,7 +1171,10 @@ Panel {
                                     }
                                     Text {
                                         width: root.panelWidthHint - Style.space(130)
-                                        text: modelData.note
+                                        text: (modelData.note || "") +
+                                              (modelData.tracks
+                                                  ? " · " + modelData.tracks.length + " titel"
+                                                  : "")
                                         color: Qt.alpha(root.barForeground, 0.5)
                                         font.family: root.monoFont
                                         font.pixelSize: Style.font.subtitle
@@ -1252,16 +1374,20 @@ Panel {
                         font.pixelSize: Style.font.subtitle
                     }
 
-                    // Kopfzeile der Titel-Liste: Anzahl + „ganze playlist“.
+                    // Kopfzeile der Titel-Liste: Anzahl + Dauer + „ganze playlist“.
                     Row {
                         width: parent.width
-                        visible: root.playlist.length > 0
+                        visible: root.currentPlaylist !== ""
                         spacing: Style.space(8)
 
                         Text {
                             id: playlistCount
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.playlist.length + " titel · klick = ab hier weiterspielen"
+                            text: root.playlist.length > 0
+                                ? root.playlist.length + " titel · " +
+                                  Model.fmtTime(Model.playlistSeconds(root.playlist)) +
+                                  " gesamt · klick = ab hier weiterspielen"
+                                : "keine titel geladen – ▶ startet die quelle direkt"
                             color: Qt.alpha(root.barForeground, 0.7)
                             font.family: root.monoFont
                             font.pixelSize: Style.font.subtitle
@@ -1340,13 +1466,24 @@ Panel {
 
                                 // Titel (einzeilig gekürzt).
                                 Text {
-                                    width: parent.width - Style.space(80)
+                                    width: parent.width - Style.space(130)
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.title
                                     color: root.barForeground
                                     font.family: root.monoFont
                                     font.pixelSize: Style.font.subtitle
                                     elide: Text.ElideRight
+                                }
+
+                                // Titeldauer (m:ss) – echte Werte aus dem
+                                // Song-Katalog bzw. von yt-dlp.
+                                Text {
+                                    visible: (modelData.seconds || 0) > 0
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: Model.fmtTime(modelData.seconds || 0)
+                                    color: Qt.alpha(root.barForeground, 0.5)
+                                    font.family: root.monoFont
+                                    font.pixelSize: Style.font.subtitle
                                 }
 
                                 // Diesen Titel abspielen.
