@@ -8,9 +8,7 @@
 [![Version 1.1.0](https://img.shields.io/badge/version-1.1.0-84cc16?labelColor=18181b)](CHANGELOG.md)
 [![Lizenz: MIT](https://img.shields.io/badge/license-MIT-24292e?labelColor=18181b)](LICENSE)
 
-Ein `bar-widget` für [Omarchy 4](https://omarchy.org) (Arch Linux + Hyprland
-+ Quickshell-Shell). Die Leiste zeigt ein ♪-Symbol (der aktuelle Titel steht
-im Tooltip), ein Klick öffnet das Panel mit vier Werkstätten: **Musik**
+Ein `bar-widget` für [Omarchy 4](https://omarchy.org) (Arch Linux + Hyprland + Quickshell-Shell). Die Leiste zeigt ein ♪-Symbol (der aktuelle Titel steht im Tooltip), ein Klick öffnet das Panel mit vier Werkstätten: **Musik**
 (MPRIS-Steuerung + Playlist-Browser mit allen Playlisten von
 familienfabrik.at), **Video** (mpv-Launcher + die Fabrik-Videos inklusive
 Untertitel), **Lesen** (Geschichten direkt im Panel, ganz ohne Browser) und
